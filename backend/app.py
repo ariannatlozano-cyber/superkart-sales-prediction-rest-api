@@ -1,5 +1,5 @@
 
-# Import necessary libaries
+# Import necessary libraries
 import numpy as np
 import joblib # Loading the serialized model
 import pandas as pd # for data manipulation
@@ -12,63 +12,56 @@ superkart_model_predictor_api = Flask("SuperKart Model Predictor")
 saved_model = joblib.load('backend_files/superkart_model.joblib')
 
 # Define a route for the home page (GET request)
-@rental_price_predictor_api.get('/')
+@superkart_model_predictor_api.get('/')
 def home():
     """
     This function handles GET requests to the root URL ('/') of the API.
     It returns a simple welcome message.
     """
-    return "Welcome to the Airbnb Rental Price Prediction API!"
+    return "Welcome to the SuperKart Product Store Sales Prediction API!"
 
-# Define an endpoint for single property prediction (POST request)
-@rental_price_predictor_api.post('/v1/rental')
-def predict_rental_price():
+# Define an endpoint for single product sales prediction (POST request)
+@superkart_model_predictor_api.post('/v1/predict')
+def predict_sales():
     """
-    This function handles POST requests to the '/v1/rental' endpoint.
-    It expects a JSON payload containing property details and returns
-    the predicted rental price as a JSON response.
+    This function handles POST requests to the '/v1/predict' endpoint.
+    It expects a JSON payload containing product and store details and returns
+    the predicted sales total as a JSON response.
     """
     # Get the JSON data from the request body
-    property_data = request.get_json()
+    input_payload = request.get_json()
 
-    # Extract relevant features from the JSON data
+    # Extract relevant features matching the model's expected columns
     sample = {
-        'room_type': property_data['room_type'],
-        'accommodates': property_data['accommodates'],
-        'bathrooms': property_data['bathrooms'],
-        'cancellation_policy': property_data['cancellation_policy'],
-        'cleaning_fee': property_data['cleaning_fee'],
-        'instant_bookable': property_data['instant_bookable'],
-        'review_scores_rating': property_data['review_scores_rating'],
-        'bedrooms': property_data['bedrooms'],
-        'beds': property_data['beds']
+        'Product_Weight': input_payload['Product_Weight'],
+        'Product_Sugar_Content': input_payload['Product_Sugar_Content'],
+        'Product_Allocated_Area': input_payload['Product_Allocated_Area'],
+        'Product_MRP': input_payload['Product_MRP'],
+        'Store_Size': input_payload['Store_Size'],
+        'Store_Location_City_Type': input_payload['Store_Location_City_Type'],
+        'Store_Type': input_payload['Store_Type']
     }
 
     # Convert the extracted data into a Pandas DataFrame
     input_data = pd.DataFrame([sample])
 
-    # Make prediction (get log_price)
-    predicted_log_price = model.predict(input_data)[0]
+    # Make prediction directly (targets are modeled in raw dollars, no log_price used)
+    predicted_sales = saved_model.predict(input_data)[0]
 
-    # Calculate actual price
-    predicted_price = np.exp(predicted_log_price)
+    # Convert predicted sales value to float and round to 2 decimal places
+    predicted_sales = round(float(predicted_sales), 2)
 
-    # Convert predicted_price to Python float
-    predicted_price = round(float(predicted_price), 2)
-    # The conversion above is needed as we convert the model prediction (log price) to actual price using np.exp, which returns predictions as NumPy float32 values.
-    # When we send this value directly within a JSON response, Flask's jsonify function encounters a datatype error
-
-    # Return the actual price
-    return jsonify({'Predicted Price (in dollars)': predicted_price})
+    # Return the actual predicted sales total
+    return jsonify({'Predicted Product Store Sales': predicted_sales})
 
 
 # Define an endpoint for batch prediction (POST request)
-@rental_price_predictor_api.post('/v1/rentalbatch')
-def predict_rental_price_batch():
+@superkart_model_predictor_api.post('/v1/predictbatch')
+def predict_sales_batch():
     """
-    This function handles POST requests to the '/v1/rentalbatch' endpoint.
-    It expects a CSV file containing property details for multiple properties
-    and returns the predicted rental prices as a dictionary in the JSON response.
+    This function handles POST requests to the '/v1/predictbatch' endpoint.
+    It expects a CSV file containing details for multiple products
+    and returns the predicted sales as a dictionary in the JSON response.
     """
     # Get the uploaded CSV file from the request
     file = request.files['file']
@@ -76,20 +69,18 @@ def predict_rental_price_batch():
     # Read the CSV file into a Pandas DataFrame
     input_data = pd.read_csv(file)
 
-    # Make predictions for all properties in the DataFrame (get log_prices)
-    predicted_log_prices = model.predict(input_data).tolist()
+    # Make predictions for all records in the DataFrame
+    predictions = saved_model.predict(input_data).tolist()
 
-    # Calculate actual prices
-    predicted_prices = [round(float(np.exp(log_price)), 2) for log_price in predicted_log_prices]
+    # Round prediction float values to 2 decimal places
+    predicted_sales_list = [round(float(val), 2) for val in predictions]
 
-    # Create a dictionary of predictions with property IDs as keys
-    property_ids = input_data['id'].tolist()  # Assuming 'id' is the property ID column
-    output_dict = dict(zip(property_ids, predicted_prices))  # Use actual prices
+    # Create a dictionary of predictions mapping index to predicted sales total
+    output_dict = {str(i): val for i, val in enumerate(predicted_sales_list)}
 
     # Return the predictions dictionary as a JSON response
-    return output_dict
+    return jsonify(output_dict)
 
 # Run the Flask application in debug mode if this script is executed directly
 if __name__ == '__main__':
-    rental_price_predictor_api.run(debug=True)
-
+    superkart_model_predictor_api.run(debug=True)
