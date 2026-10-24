@@ -36,8 +36,8 @@ if st.button("Predict", type="primary"):
     response = requests.post(f"{BACKEND_URL}/v1/predict", json=input_payload)
     if response.status_code == 200:
         prediction = response.json()['Predicted Product Store Sales']
-        st.success(f"Predicted Product Store Sales (in dollars): ${prediction:,.2f}")
-    else: 
+        st.success(f"Predicted Product Store Sales: ${prediction:,.2f}")
+    else:
         st.error("Unable to connect to the prediction API.")
 
 # Section for batch prediction
